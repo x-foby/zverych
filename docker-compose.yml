@@ -1,0 +1,45 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      llm:
+        condition: service_healthy
+        required: false   # локальная модель запускается только с --profile local
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./persona.md:/app/persona.md:ro
+      - botdata:/app/data
+    logging:
+      options: {max-size: "10m", max-file: "3"}
+
+  # Локальная LLM (необязательно; основной провайдер — OpenRouter): llama.cpp llama-server,
+  # официальная Gemma 4 26B-A4B QAT Q4_0 от Google (google/gemma-4-26B-A4B-it-qat-q4_0-gguf)
+  # + vision-проектор (mmproj). Запуск: docker compose --profile local up -d.
+  # Модели скачиваются в ./models заранее (см. README). Для стабильности закрепите тег
+  # образа на конкретной сборке вместо :server.
+  llm:
+    profiles: [local]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    restart: unless-stopped
+    volumes:
+      - ./models:/models:ro
+    command: >
+      --model /models/gemma-4-26B_q4_0-it.gguf
+      --mmproj /models/gemma-4-26B-it-mmproj.gguf
+      --host 0.0.0.0 --port 8080
+      --ctx-size 8192
+      --jinja
+      --cache-reuse 256
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 300s   # загрузка ~15.6 ГБ весов с диска
+      retries: 5
+    logging:
+      options: {max-size: "10m", max-file: "3"}
+
+volumes:
+  botdata:

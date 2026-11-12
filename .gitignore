@@ -1,0 +1,13 @@
+.env
+config.yaml
+persona.md
+data/
+/bot
+*.db
+*.db-*
+.mutation/
+.DS_Store
+models/
+.vscode/
+__debug_bin*
+*.log
